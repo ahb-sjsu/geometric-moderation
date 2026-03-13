@@ -1,0 +1,58 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "geometric-moderation"
+version = "0.1.0"
+description = "Geometric deep learning for content moderation — hyperbolic policy embeddings, manifold decision boundaries, and distributional fairness"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+authors = [
+    { name = "Andrew H. Bond", email = "andrew.bond@sjsu.edu" },
+]
+keywords = [
+    "content-moderation",
+    "geometric-deep-learning",
+    "hyperbolic-embeddings",
+    "fairness",
+    "adversarial-robustness",
+    "trust-and-safety",
+]
+
+dependencies = [
+    "numpy>=1.24.0",
+    "torch>=2.0.0",
+    "transformers>=4.36.0",
+    "datasets>=2.14.0",
+    "scikit-learn>=1.3.0",
+    "pandas>=2.0.0",
+]
+
+[project.optional-dependencies]
+geometric = [
+    "geoopt>=0.5.0",
+    "giotto-tda>=0.6.0",
+]
+dev = [
+    "pytest>=7.0",
+    "ruff>=0.4.0",
+    "jupyter>=1.0.0",
+    "matplotlib>=3.7.0",
+]
+all = ["geometric-moderation[geometric,dev]"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/geomod"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "UP", "B", "SIM"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v --tb=short"
