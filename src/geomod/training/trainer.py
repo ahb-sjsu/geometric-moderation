@@ -149,8 +149,9 @@ class ModerationTrainer:
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        # Build model
+        # Build model (ensure float32 — some pretrained weights load as fp16)
         self.model = _build_model(config)
+        self.model.float()
         self.model.to(self.device)
 
         # Losses
