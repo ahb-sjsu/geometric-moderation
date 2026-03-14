@@ -44,8 +44,8 @@ class HyperbolicAttentionBias(nn.Module):
     def __init__(self, num_tokens: int = 30522, embed_dim: int = 32, c: float = 1.0) -> None:
         super().__init__()
         self.ball = PoincareBall(c=c)
-        self.weight = nn.Parameter(torch.randn(num_tokens, embed_dim) * 0.01)
-        self.scale = nn.Parameter(torch.tensor(1.0))
+        self.weight = nn.Parameter(torch.randn(num_tokens, embed_dim) * 0.05)
+        self.scale = nn.Parameter(torch.tensor(0.5))
 
     def forward(self, token_ids: torch.Tensor) -> torch.Tensor:
         """Compute attention bias matrix.
@@ -139,21 +139,32 @@ class GeometricEncoderWrapper:
         return list(self.model.parameters()) + list(self.geo_bias.parameters())
 
     def _attention_hook(self, module: nn.Module, args: Any, output: Any) -> Any:
-        """Forward hook that adds geometric bias to attention output."""
+        """Forward hook that adds geometric bias to attention output.
+
+        We add the geometric bias as a residual attention path:
+        compute geo-attention weights from hyperbolic distances,
+        apply them to the VALUE vectors (from the attention output),
+        and add as a scaled residual.
+        """
         if self._current_input_ids is None:
             return output
 
         if isinstance(output, tuple) and len(output) >= 1:
             attn_output = output[0]
-            # Compute per-sample geometric bias (handles full batch)
+            # Compute geometric attention bias (negative distances = similarity)
             geo_b = self.geo_bias(self._current_input_ids)  # (batch, seq, seq)
             geo_b = geo_b.to(dtype=attn_output.dtype, device=attn_output.device)
             seq_len = min(geo_b.shape[-1], attn_output.shape[1])
             geo_b = geo_b[:, :seq_len, :seq_len]
-            weights = torch.softmax(geo_b, dim=-1)  # (batch, seq, seq)
-            residual = torch.matmul(weights, attn_output[:, :seq_len, :])
+
+            # Scale matters: geo_b values should be comparable to attention logits
+            # Use the learned scale parameter inside geo_bias
+            geo_weights = torch.softmax(geo_b, dim=-1)  # (batch, seq, seq)
+            geo_ctx = torch.matmul(geo_weights, attn_output[:, :seq_len, :])
+
+            # Gated residual: let model learn how much geometric info to use
             modified = attn_output.clone()
-            modified[:, :seq_len, :] = attn_output[:, :seq_len, :] + 0.1 * residual
+            modified[:, :seq_len, :] = attn_output[:, :seq_len, :] + geo_ctx
             return (modified,) + output[1:]
 
         return output

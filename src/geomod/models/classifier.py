@@ -56,9 +56,11 @@ class HyperbolicClassifier(nn.Module):
             nn.GELU(),
             nn.Linear(hyp_dim * 2, hyp_dim),
         )
-        # Init last layer small so content embeddings start near origin
-        # (avoids huge Poincaré distances at init → logit explosion)
-        nn.init.normal_(self.projection[-1].weight, std=0.01)
+        # Init last layer with moderate spread so content embeddings
+        # start with enough separation on the Poincaré ball for meaningful
+        # distance-based classification. Too small (0.01) → all embeddings
+        # collapse near origin → equal distances → zero gradient signal.
+        nn.init.normal_(self.projection[-1].weight, std=0.1)
         nn.init.zeros_(self.projection[-1].bias)
 
         # Policy taxonomy embedding

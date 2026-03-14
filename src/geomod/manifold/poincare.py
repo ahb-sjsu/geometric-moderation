@@ -56,8 +56,9 @@ class PoincareBall:
     def log_map_0(self, y: torch.Tensor) -> torch.Tensor:
         """Logarithmic map to the origin: ball point → tangent vector."""
         sqrt_c = self.c**0.5
-        y_norm = y.norm(dim=-1, keepdim=True).clamp(min=1e-15)
-        return (1.0 / sqrt_c) * torch.atanh(sqrt_c * y_norm) * (y / y_norm)
+        y_norm = y.norm(dim=-1, keepdim=True).clamp(min=1e-15, max=self.radius - 1e-5)
+        arg = (sqrt_c * y_norm).clamp(max=1.0 - 1e-6)
+        return (1.0 / sqrt_c) * torch.atanh(arg) * (y / y_norm)
 
     def exp_map(self, x: torch.Tensor, v: torch.Tensor) -> torch.Tensor:
         """Exponential map at point x: move along tangent vector v."""
@@ -73,7 +74,8 @@ class PoincareBall:
         sqrt_c = self.c**0.5
         diff = self.mobius_add(-x, y)
         diff_norm = diff.norm(dim=-1).clamp(min=1e-15, max=self.radius - 1e-5)
-        return (2.0 / sqrt_c) * torch.atanh(sqrt_c * diff_norm)
+        arg = (sqrt_c * diff_norm).clamp(max=1.0 - 1e-6)
+        return (2.0 / sqrt_c) * torch.atanh(arg)
 
     def project(self, x: torch.Tensor, eps: float = 1e-5) -> torch.Tensor:
         """Project onto the open ball (ensure ‖x‖ < 1/√c)."""
@@ -93,8 +95,9 @@ class PoincareBall:
     def mobius_scalar_mul(self, r: float, x: torch.Tensor) -> torch.Tensor:
         """Scalar multiplication r ⊗_c x in the Poincaré ball."""
         sqrt_c = self.c**0.5
-        x_norm = x.norm(dim=-1, keepdim=True).clamp(min=1e-15)
-        return (1.0 / sqrt_c) * torch.tanh(r * torch.atanh(sqrt_c * x_norm)) * (x / x_norm)
+        x_norm = x.norm(dim=-1, keepdim=True).clamp(min=1e-15, max=self.radius - 1e-5)
+        arg = (sqrt_c * x_norm).clamp(max=1.0 - 1e-6)
+        return (1.0 / sqrt_c) * torch.tanh(r * torch.atanh(arg)) * (x / x_norm)
 
     def pairwise_dist(self, x: torch.Tensor) -> torch.Tensor:
         """Pairwise distance matrix for a set of points.
@@ -126,7 +129,7 @@ class HyperbolicEmbedding(nn.Module):
     def __init__(self, num_items: int, embed_dim: int, c: float = 1.0) -> None:
         super().__init__()
         self.ball = PoincareBall(c=c)
-        self.weight = nn.Parameter(torch.randn(num_items, embed_dim) * 0.01)
+        self.weight = nn.Parameter(torch.randn(num_items, embed_dim) * 0.05)
 
     def forward(self, ids: torch.Tensor) -> torch.Tensor:
         """Look up and project embeddings onto the ball."""

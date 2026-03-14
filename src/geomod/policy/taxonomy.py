@@ -172,8 +172,9 @@ class PolicyTaxonomyEmbedding(nn.Module):
                 # Root at origin
                 init[idx] = torch.zeros(dim)
             else:
-                # Radius proportional to depth
-                radius = 0.3 * depth / max(max_depth, 1)
+                # Radius proportional to depth — spread nodes across the ball
+                # so distance-based classification has meaningful gradients
+                radius = 0.5 * depth / max(max_depth, 1)
                 # Angle in 2D subspace (first two dims)
                 angle = angle_start + angle_span / 2
                 init[idx, 0] = radius * torch.cos(torch.tensor(angle))
