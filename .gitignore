@@ -10,9 +10,9 @@ venv/
 .env
 *.pt
 *.pth
-models/
+/models/
 checkpoints/
-data/
+/data/
 *.csv
 .ipynb_checkpoints/
 .ruff_cache/
