@@ -68,6 +68,10 @@ class HyperbolicClassifier(nn.Module):
         self.taxonomy_emb = PolicyTaxonomyEmbedding(taxonomy, hyp_dim, c)
         self.taxonomy = taxonomy
 
+        # Learnable per-class bias — lets the model learn class priors
+        # independently from distances (critical for class-weighted CE loss)
+        self.class_bias = nn.Parameter(torch.zeros(self.taxonomy_emb.num_nodes))
+
     def forward(
         self, encoder_output: torch.Tensor
     ) -> dict[str, torch.Tensor]:
@@ -91,9 +95,9 @@ class HyperbolicClassifier(nn.Module):
         embedding = self.ball.exp_map_0(tangent)
         embedding = self.ball.project(embedding)
 
-        # Classify by distance to policy nodes
+        # Classify by distance to policy nodes + learnable class prior
         distances, logits = self.taxonomy_emb.classify(embedding)
-        logits = logits / self.temperature
+        logits = logits / self.temperature + self.class_bias
 
         # Severity = distance from origin
         severity = self.taxonomy_emb.severity(embedding)
