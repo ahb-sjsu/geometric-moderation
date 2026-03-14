@@ -61,6 +61,15 @@ def _build_model(config: TrainingConfig) -> nn.Module:
             use_geometric_attention=True,
             temperature=config.temperature,
         )
+    elif config.ablation == AblationConfig.HYBRID:
+        from geomod.models.hybrid import HybridModerationModel
+        return HybridModerationModel(
+            encoder_name=config.encoder_name,
+            hyp_dim=config.hyp_dim,
+            c=config.curvature,
+            use_geometric_attention=True,
+            temperature=config.temperature,
+        )
     else:
         raise ValueError(f"Unknown ablation config: {config.ablation}")
 
@@ -227,6 +236,13 @@ class ModerationTrainer:
         labels = batch["taxonomy_label"].to(self.device)
 
         loss = self.ce_loss(logits, labels)
+
+        # Auxiliary Poincaré classification loss (hybrid model)
+        if "poincare_logits" in model_output and self.config.auxiliary_weight > 0:
+            poincare_logits = self._mask_logits(model_output["poincare_logits"])
+            loss = loss + self.config.auxiliary_weight * self.ce_loss(
+                poincare_logits, labels
+            )
 
         if "severity" in model_output and self.config.severity_weight > 0:
             severity_pred = model_output["severity"].squeeze(-1)

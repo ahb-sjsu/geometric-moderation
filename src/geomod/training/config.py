@@ -15,10 +15,11 @@ from enum import Enum
 
 
 class AblationConfig(Enum):
-    """Three ablation configurations."""
+    """Four ablation configurations."""
     FLAT_BASELINE = "flat_baseline"
     HYPERBOLIC_HEAD = "hyperbolic_head"
     FULL_GEOMETRIC = "full_geometric"
+    HYBRID = "hybrid"
 
 
 @dataclass
@@ -86,6 +87,7 @@ class TrainingConfig:
     hyp_dim: int = 32
     curvature: float = 1.0
     temperature: float = 1.0
+    auxiliary_weight: float = 0.3
     severity_weight: float = 0.5
     warmup_ratio: float = 0.1
     weight_decay: float = 0.01
