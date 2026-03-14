@@ -202,15 +202,28 @@ class ModerationTrainer:
         self.use_amp = config.fp16 and self.device.type == "cuda"
         self.scaler = GradScaler("cuda", enabled=self.use_amp)
 
+        # Mask for active classes (classes with training samples)
+        # Prevents model from predicting unseen taxonomy nodes
+        if class_weights is not None:
+            self._active_mask = (class_weights > 0).to(self.device)
+        else:
+            self._active_mask = None
+
         # Early stopping
         self.best_f1 = 0.0
         self.patience_counter = 0
+
+    def _mask_logits(self, logits: torch.Tensor) -> torch.Tensor:
+        """Mask logits for unseen classes to -inf so softmax ignores them."""
+        if self._active_mask is not None:
+            logits = logits.masked_fill(~self._active_mask.unsqueeze(0), float("-inf"))
+        return logits
 
     def _compute_loss(
         self, model_output: dict[str, torch.Tensor], batch: dict[str, torch.Tensor]
     ) -> torch.Tensor:
         """Compute combined classification + severity loss."""
-        logits = model_output["logits"]
+        logits = self._mask_logits(model_output["logits"])
         labels = batch["taxonomy_label"].to(self.device)
 
         loss = self.ce_loss(logits, labels)
@@ -274,7 +287,7 @@ class ModerationTrainer:
             attention_mask = batch["attention_mask"].to(self.device)
 
             output = self.model(input_ids=input_ids, attention_mask=attention_mask)
-            logits = output["logits"]
+            logits = self._mask_logits(output["logits"])
             preds = logits.argmax(dim=-1).cpu().numpy()
             labels = batch["taxonomy_label"].numpy()
 
