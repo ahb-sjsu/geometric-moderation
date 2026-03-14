@@ -189,11 +189,11 @@ def get_label_weights(dataset: CivilCommentsDataset) -> torch.Tensor:
         label = dataset[i]["taxonomy_label"]
         counts[label] += 1
 
-    # Inverse frequency with smoothing
+    # Inverse frequency with sqrt dampening — prevents rare classes
+    # from overwhelming distance-based classifiers
     total = counts.sum()
     weights = total / (num_nodes * counts.clamp(min=1))
-    # Zero out unseen classes — can't train on what we've never seen
     weights[counts == 0] = 0.0
-    # Cap extreme weights
+    weights = weights.sqrt()
     weights = weights.clamp(max=100.0)
     return weights
