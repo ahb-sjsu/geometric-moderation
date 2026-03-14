@@ -44,7 +44,7 @@ class HyperbolicClassifier(nn.Module):
         taxonomy: PolicyNode | None = None,
         hyp_dim: int = 32,
         c: float = 1.0,
-        temperature: float = 0.1,
+        temperature: float = 1.0,
     ) -> None:
         super().__init__()
         self.ball = PoincareBall(c=c)
@@ -56,6 +56,10 @@ class HyperbolicClassifier(nn.Module):
             nn.GELU(),
             nn.Linear(hyp_dim * 2, hyp_dim),
         )
+        # Init last layer small so content embeddings start near origin
+        # (avoids huge Poincaré distances at init → logit explosion)
+        nn.init.normal_(self.projection[-1].weight, std=0.01)
+        nn.init.zeros_(self.projection[-1].bias)
 
         # Policy taxonomy embedding
         if taxonomy is None:
@@ -143,6 +147,7 @@ class GeometricModerationModel(nn.Module):
         hyp_dim: int = 32,
         c: float = 1.0,
         use_geometric_attention: bool = True,
+        temperature: float = 1.0,
     ) -> None:
         super().__init__()
         from transformers import AutoModel, AutoConfig
@@ -156,6 +161,7 @@ class GeometricModerationModel(nn.Module):
             taxonomy=taxonomy,
             hyp_dim=hyp_dim,
             c=c,
+            temperature=temperature,
         )
 
         self.geo_wrapper = None

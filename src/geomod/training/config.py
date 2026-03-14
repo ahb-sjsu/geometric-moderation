@@ -85,7 +85,7 @@ class TrainingConfig:
     max_length: int = 256
     hyp_dim: int = 32
     curvature: float = 1.0
-    temperature: float = 0.1
+    temperature: float = 1.0
     severity_weight: float = 0.5
     warmup_ratio: float = 0.1
     weight_decay: float = 0.01

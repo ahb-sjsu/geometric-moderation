@@ -192,6 +192,8 @@ def get_label_weights(dataset: CivilCommentsDataset) -> torch.Tensor:
     # Inverse frequency with smoothing
     total = counts.sum()
     weights = total / (num_nodes * counts.clamp(min=1))
+    # Zero out unseen classes — can't train on what we've never seen
+    weights[counts == 0] = 0.0
     # Cap extreme weights
     weights = weights.clamp(max=100.0)
     return weights

@@ -52,11 +52,11 @@ class HyperbolicAttentionBias(nn.Module):
 
         Parameters
         ----------
-        token_ids : (seq_len,) token IDs
+        token_ids : (seq_len,) or (batch, seq_len) token IDs
 
         Returns
         -------
-        (seq_len, seq_len) attention bias
+        (seq_len, seq_len) or (batch, seq_len, seq_len) attention bias
         """
         token_ids = token_ids.clamp(0, self.weight.shape[0] - 1)
         embeds = F.embedding(token_ids, self.weight)
@@ -145,17 +145,13 @@ class GeometricEncoderWrapper:
 
         if isinstance(output, tuple) and len(output) >= 1:
             attn_output = output[0]
-            # Compute geometric bias (use first sample's token IDs)
-            geo_b = self.geo_bias(self._current_input_ids[0])  # (seq, seq)
-            # Match dtype/device of the attention output (handles autocast fp16)
+            # Compute per-sample geometric bias (handles full batch)
+            geo_b = self.geo_bias(self._current_input_ids)  # (batch, seq, seq)
             geo_b = geo_b.to(dtype=attn_output.dtype, device=attn_output.device)
-            seq_len = min(geo_b.shape[0], attn_output.shape[1])
-            geo_bias_expanded = geo_b[:seq_len, :seq_len]
-            weights = torch.softmax(geo_bias_expanded, dim=-1)  # (seq, seq)
-            residual = torch.matmul(
-                weights.unsqueeze(0).expand(attn_output.shape[0], -1, -1),
-                attn_output[:, :seq_len, :]
-            )
+            seq_len = min(geo_b.shape[-1], attn_output.shape[1])
+            geo_b = geo_b[:, :seq_len, :seq_len]
+            weights = torch.softmax(geo_b, dim=-1)  # (batch, seq, seq)
+            residual = torch.matmul(weights, attn_output[:, :seq_len, :])
             modified = attn_output.clone()
             modified[:, :seq_len, :] = attn_output[:, :seq_len, :] + 0.1 * residual
             return (modified,) + output[1:]

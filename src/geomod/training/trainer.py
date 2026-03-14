@@ -50,6 +50,7 @@ def _build_model(config: TrainingConfig) -> nn.Module:
             hyp_dim=config.hyp_dim,
             c=config.curvature,
             use_geometric_attention=False,
+            temperature=config.temperature,
         )
     elif config.ablation == AblationConfig.FULL_GEOMETRIC:
         from geomod.models.classifier import GeometricModerationModel
@@ -58,6 +59,7 @@ def _build_model(config: TrainingConfig) -> nn.Module:
             hyp_dim=config.hyp_dim,
             c=config.curvature,
             use_geometric_attention=True,
+            temperature=config.temperature,
         )
     else:
         raise ValueError(f"Unknown ablation config: {config.ablation}")
@@ -306,7 +308,7 @@ class ModerationTrainer:
         """
         history = {"train_loss": [], "eval_metrics": []}
 
-        output_dir = Path(self.config.output_dir) / self.config.ablation.value
+        output_dir = Path(self.config.output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
 
         logger.info(
