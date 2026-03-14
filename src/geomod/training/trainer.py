@@ -28,7 +28,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
-from torch.cuda.amp import GradScaler
+from torch.amp import GradScaler
 
 from geomod.training.config import AblationConfig, TrainingConfig
 from geomod.training.metrics import compute_metrics
@@ -197,7 +197,8 @@ class ModerationTrainer:
         )
 
         # Mixed precision
-        self.scaler = GradScaler(enabled=config.fp16 and self.device.type == "cuda")
+        self.use_amp = config.fp16 and self.device.type == "cuda"
+        self.scaler = GradScaler("cuda", enabled=self.use_amp)
 
         # Early stopping
         self.best_f1 = 0.0
@@ -235,7 +236,7 @@ class ModerationTrainer:
 
             with torch.autocast(
                 device_type=self.device.type,
-                enabled=self.config.fp16 and self.device.type == "cuda",
+                enabled=self.use_amp,
             ):
                 output = self.model(input_ids=input_ids, attention_mask=attention_mask)
                 loss = self._compute_loss(output, batch)
@@ -245,9 +246,12 @@ class ModerationTrainer:
             nn.utils.clip_grad_norm_(
                 self.model.parameters(), self.config.max_grad_norm
             )
+            # Only step scheduler when optimizer actually updates
+            old_scale = self.scaler.get_scale()
             self.scaler.step(self.optimizer)
             self.scaler.update()
-            self.scheduler.step()
+            if self.scaler.get_scale() >= old_scale:
+                self.scheduler.step()
 
             total_loss += loss.item()
             n_batches += 1

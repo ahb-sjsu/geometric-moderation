@@ -159,13 +159,18 @@ class GeometricModerationModel(nn.Module):
         )
 
         self.geo_wrapper = None
+        self.geo_bias = None
         if use_geometric_attention:
-            from geomod.models.attention import GeometricEncoderWrapper
-            self.geo_wrapper = GeometricEncoderWrapper(
-                self.encoder,
-                vocab_size=config.vocab_size,
+            from geomod.models.attention import GeometricEncoderWrapper, HyperbolicAttentionBias
+            # Register geo_bias as a submodule so .to(device) moves it
+            self.geo_bias = HyperbolicAttentionBias(
+                num_tokens=config.vocab_size,
                 embed_dim=hyp_dim,
                 c=c,
+            )
+            self.geo_wrapper = GeometricEncoderWrapper(
+                self.encoder,
+                geo_bias=self.geo_bias,
             )
             self.geo_wrapper.install_hooks()
 

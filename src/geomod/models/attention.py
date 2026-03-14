@@ -91,24 +91,24 @@ class GeometricEncoderWrapper:
     def __init__(
         self,
         model: nn.Module,
+        geo_bias: HyperbolicAttentionBias | None = None,
         vocab_size: int = 30522,
         embed_dim: int = 32,
         c: float = 1.0,
         num_layers_bias: int = 4,
     ) -> None:
         self.model = model
-        self.geo_bias = HyperbolicAttentionBias(
-            num_tokens=vocab_size,
-            embed_dim=embed_dim,
-            c=c,
-        )
+        if geo_bias is not None:
+            self.geo_bias = geo_bias
+        else:
+            self.geo_bias = HyperbolicAttentionBias(
+                num_tokens=vocab_size,
+                embed_dim=embed_dim,
+                c=c,
+            )
         self.num_layers_bias = num_layers_bias
         self._hooks: list[torch.utils.hooks.RemovableHook] = []
         self._current_input_ids: torch.Tensor | None = None
-
-        # Move geo_bias to same device as model
-        device = next(model.parameters()).device
-        self.geo_bias = self.geo_bias.to(device)
 
     def install_hooks(self) -> None:
         """Install forward hooks on encoder self-attention layers."""
@@ -145,16 +145,13 @@ class GeometricEncoderWrapper:
 
         if isinstance(output, tuple) and len(output) >= 1:
             attn_output = output[0]
-            # Compute geometric bias
+            # Compute geometric bias (use first sample's token IDs)
             geo_b = self.geo_bias(self._current_input_ids[0])  # (seq, seq)
+            # Match dtype/device of the attention output (handles autocast fp16)
+            geo_b = geo_b.to(dtype=attn_output.dtype, device=attn_output.device)
             seq_len = min(geo_b.shape[0], attn_output.shape[1])
-            # Add bias to the attention output as a residual
-            # This is a simplified injection; for full integration,
-            # hook into the attention score computation directly
             geo_bias_expanded = geo_b[:seq_len, :seq_len]
-            # Apply as soft attention reweighting
             weights = torch.softmax(geo_bias_expanded, dim=-1)  # (seq, seq)
-            # Modulate: weighted sum adds structured information
             residual = torch.matmul(
                 weights.unsqueeze(0).expand(attn_output.shape[0], -1, -1),
                 attn_output[:, :seq_len, :]
