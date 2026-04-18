@@ -12,11 +12,8 @@ jobs:
   pypi:
     name: Build + publish to PyPI
     runs-on: ubuntu-latest
-    # Uses PyPI trusted publishing — configure a publisher on PyPI for
-    # this project with workflow filename "release.yml", environment blank.
-    permissions:
-      id-token: write
-      contents: read
+    # Uses an API token stored as a GitHub secret — set PYPI_API_TOKEN
+    # at the repo or org level. No per-project PyPI configuration required.
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -28,3 +25,5 @@ jobs:
         run: python -m build
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
