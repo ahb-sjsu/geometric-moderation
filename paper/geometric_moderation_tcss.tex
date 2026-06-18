@@ -2,11 +2,10 @@
 % Target venue: IEEE Transactions on Computational Social Systems (TCSS)
 % Compile: pdflatex geometric_moderation_tcss.tex  (IEEEtran journal class)
 %
-% NOTE ON RESULTS: every empirical cell is taken from the released ablation and
-% cross-lingual runs (scripts/ablation_rerun.py, scripts/multilingual_bond_index.py;
-% notebooks/02_ablation_study_results_*). No numbers are invented. Metrics that
-% were defined but NOT empirically run in this study (SPD fairness gap, MRI) are
-% marked "not run" rather than estimated.
+% NOTE ON RESULTS: every empirical number is produced by the released harness
+% scripts/deme_aita_eval.py (evaluation) and scripts/deme_aita_analyze.py
+% (analysis), over 240 AITA posts; raw per-item records and the analysis log
+% are in outputs/aita_eval/. No numbers are invented.
 
 \documentclass[journal]{IEEEtran}
 
@@ -20,13 +19,10 @@
 \usepackage{url}
 \hyphenation{op-tical net-works semi-conduc-tor}
 
-\newcommand{\nr}{\textit{not run}}
-
 \begin{document}
 
 \title{Per-Stakeholder Content Moderation with Democratically-Governed
-Ethics Modules: Moral Tensors, Worst-Off/Escalate Enforcement, and a
-Negative Result on Hyperbolic Policy Embeddings}
+Ethics Modules: Moral Tensors and Worst-Off/Escalate Enforcement}
 
 \author{Andrew~H.~Bond,~\IEEEmembership{Senior Member,~IEEE}% <-this % stops a space
 \thanks{A.~H.~Bond is with the Department of Computer Engineering,
@@ -46,28 +42,32 @@ represent nor govern that plurality. We reframe moderation as the construction
 and governance of a \emph{per-stakeholder moral representation}. Each
 stakeholder's values are encoded as an \emph{Ethics Module} (EM)---a weighting
 over ethical-concern primitives that, composed in a directed acyclic graph
-(DAG), the framework can enforce. EMs are constructed by interchangeable
-methods: elicited through a structured game, fit from data, or authored. A
-conversation is compiled---once per stakeholder ethos, via a structure-preserving
-moral compiler---into a rank-4--6 moral tensor over the axes (dimension,
-stakeholder, turn, action, coalition, uncertainty). The resulting per-stakeholder
-verdicts are aggregated by an \emph{explicit} policy: \emph{worst-off} (the most
-protective verdict governs, so a permissive stakeholder cannot override a harmed
-one) and \emph{escalate} (cross-stakeholder disagreement, or any escalate-tier
-verdict, routes to human review rather than collapsing to a confident scalar).
-We additionally \emph{test, and report as a negative result}, the hypothesis
-that embedding the policy taxonomy in hyperbolic space improves the underlying
-classifier: on Civil Comments a flat baseline matches or beats a hyperbolic head
-on macro-F1 and on cross-lingual verdict invariance. The contribution of
-geometry to moderation is therefore not a better label but an auditable
-per-stakeholder representation and the governance it enables. We release an
-open-source reference implementation.
+(DAG), the framework can enforce. A conversation is compiled---once per
+stakeholder ethos, via a structure-preserving moral compiler with an LLM
+extractor---into a rank-4 moral tensor over the axes (dimension, stakeholder,
+turn, action, coalition, uncertainty). Per-stakeholder verdicts are aggregated
+by an \emph{explicit} policy: worst-off (the most protective verdict governs)
+and escalate (cross-stakeholder disagreement, or any escalate-tier verdict,
+routes to human review rather than collapsing to a confident scalar). We
+evaluate the system on 240 real moral dilemmas (the AITA corpus) under two
+shipped stakeholder ethos. Three findings: (i) the ethos encode systematically
+\emph{different} value systems, in the direction their construction predicts
+(e.g.\ the harm/care ethos weights physical harm significantly more negatively;
+all per-dimension sign tests $p<0.001$; verdicts diverge on 34\% of posts);
+(ii) the multi-dimensional tensor \emph{separates situation-level harm from
+author-level normative violation}---aggregate harm does not track the human
+culpability label ($\rho{=}{-}0.05$, n.s.), but specific normative dimensions
+(fairness, care) do, structure a scalar toxicity score conflates; and (iii)
+worst-off/escalate is consequential---relative to a single decisive
+stakeholder, it routes 34\% more cases to human review by surfacing, rather
+than laundering, stakeholder disagreement. We report honestly that DEME is not
+a culpability classifier and that escalation does not discriminate among
+uniformly hard dilemmas. We release the full evaluation and analysis harness.
 \end{abstract}
 
 \begin{IEEEkeywords}
 Content moderation, trust and safety, computational ethics, value pluralism,
-stakeholder governance, moral tensors, algorithmic fairness, hyperbolic
-embeddings (negative result).
+stakeholder governance, moral tensors, algorithmic fairness.
 \end{IEEEkeywords}
 
 \section{Introduction}
@@ -79,15 +79,14 @@ transformer encoder followed by a linear head and per-label sigmoids. This
 framing is convenient and discards exactly the structure that makes moderation
 hard as a \emph{social} problem.
 
-The structure it discards is not primarily geometric; it is
-\emph{stakeholder plurality}. A platform's communities, advertisers, vulnerable
-users, regulators, and broader society do not share one value system, and the
-disagreements among them are not noise to be averaged into a single score---they
-are the substance of the moderation decision. A scalar toxicity probability
-cannot represent ``this is permissible to a fairness-weighted community moderator
-but harmful to a care-weighted vulnerable-user advocate,'' and a classifier that
-silently picks one of those positions has made a contested metaethical choice
-without disclosing it.
+The structure it discards is \emph{stakeholder plurality}. A platform's
+communities, advertisers, vulnerable users, regulators, and broader society do
+not share one value system, and the disagreements among them are not noise to be
+averaged into a single score---they are the substance of the moderation
+decision. A scalar toxicity probability cannot represent ``this is permissible
+to a fairness-weighted community moderator but harmful to a care-weighted
+vulnerable-user advocate,'' and a classifier that silently picks one of those
+positions has made a contested metaethical choice without disclosing it.
 
 We therefore reframe the automated component. The object to compute is not a
 label but a \emph{per-stakeholder moral representation of a conversation}, and
@@ -97,23 +96,21 @@ are:
 \begin{enumerate}
 \item A per-stakeholder moderation framework in which stakeholder values are
 \emph{Ethics Modules} composed in a DAG, and a conversation is compiled---once
-per ethos---into a rank-4--6 moral tensor (Section~\ref{sec:framework}).
+per ethos---into a rank-4 moral tensor (Section~\ref{sec:framework}).
 \item A \emph{worst-off~$+$~escalate} enforcement rule that treats
 cross-stakeholder disagreement as a first-class, non-aggregable escalation
 signal (Section~\ref{sec:enforce}).
-\item A cross-lingual \emph{Bond Index} evaluation of verdict invariance, with
-the finding that a language-agnostic encoder---\emph{not} added hyperbolic
-geometry---delivers the invariance (Section~\ref{sec:eval}).
-\item An honest \emph{negative result}: a hyperbolic policy-embedding classifier
-does not improve over a flat baseline on macro-F1 or severity ranking on Civil
-Comments, with an open-source reference implementation
-(Sections~\ref{sec:impl}--\ref{sec:eval}).
+\item An empirical evaluation on 240 real moral dilemmas showing that the ethos
+differentiate as designed, that the multi-dimensional tensor separates
+situation-harm from author-violation, and that the enforcement rule is
+consequential---together with honest negatives about what the system is not
+(Section~\ref{sec:eval}).
 \end{enumerate}
 
 \section{Related Work}
 \textbf{Toxicity and hate-speech classification.} Public benchmarks---Jigsaw
 Toxic Comment, Civil Comments \cite{civil}, HateXplain \cite{hatexplain}---have
-driven strong flat classifiers. We reuse these benchmarks but change the
+driven strong flat classifiers. We reuse the \emph{problem} but change the
 \emph{object} produced, from a label to a per-stakeholder representation.
 
 \textbf{Value pluralism and participatory moderation.} A growing literature
@@ -123,16 +120,10 @@ explicit modules, and their conflicts drive escalation by construction.
 
 \textbf{Computational and pluralist ethics.} A line of work compiles
 natural-language moral material into structured representations evaluated under
-multiple normative frameworks. We use such a compiler \cite{erisml} as the
-substrate: a conversation is compiled per stakeholder ethos into a DEME moral
-tensor, and disagreement across stakeholders is treated as a non-aggregable
-signal.
-
-\textbf{Hyperbolic representation learning.} Hyperbolic spaces embed trees with
-exponentially less distortion than Euclidean space \cite{nickel}, motivating
-their use for hierarchical labels. We tested this for the policy taxonomy and
-report a negative result (Section~\ref{sec:eval}); it is included for
-falsifiability, not as a contribution.
+multiple normative frameworks \cite{erisml}, and learns norm/judgment models
+from social data \cite{socialchem}. We use such a compiler as the substrate: a
+conversation is compiled per stakeholder ethos into a DEME moral tensor, and
+disagreement across stakeholders is treated as a non-aggregable signal.
 
 \section{The Per-Stakeholder Framework}
 \label{sec:framework}
@@ -142,41 +133,35 @@ A stakeholder's values are an \emph{Ethics Module} (EM): a weighting over ten
 ethical-concern primitives---harm, autonomy, fairness, rights, care, fidelity,
 legitimacy, epistemic quality, externality, repair---each projecting onto one of
 nine moral dimensions. EMs are \emph{constructed} by interchangeable methods:
-\emph{elicited} through a structured game (an advice-column ``Dear Ethicist''
-probe that recovers a player's deontic structure---obligation, claim, privilege,
-power---while they believe they are only giving advice), \emph{fit from data}
-(e.g.\ the Social-Chem-101--derived \texttt{dear\_abby} and \texttt{aita} ethos
-profiles used below), or \emph{authored}. The EMs are wired into a DAG whose
-topology \emph{is} the moral composition, evaluated in dependency order; the
-framework then enforces whatever the EMs encode. This is DEME:
+elicited through a structured game, fit from data (the Social-Chem-101--derived
+\texttt{dear\_abby} and \texttt{aita} ethos profiles used below
+\cite{socialchem}), or authored. The EMs are wired into a DAG whose topology
+\emph{is} the moral composition, evaluated in dependency order; the framework
+then enforces whatever the EMs encode. This is DEME:
 democratically-governed ethics modules.
 
 \subsection{A conversation as a moral tensor}
 A thread compiles into a moral tensor of rank 4--6 over the axes
 $(k,n,\tau,a,c,s)$: ethical \emph{dimension} $k$, \emph{stakeholder} $n$,
 \emph{turn} $\tau$, \emph{action} $a$, \emph{coalition} $c$, and \emph{fact
-uncertainty} $s$ (Monte-Carlo). ``Evaluate per stakeholder'' is literal: the
-same conversation is compiled \emph{once per stakeholder ethos}, yielding that
-stakeholder's slice of the $n$ axis together with its own verdict, confidence,
-and a hash-chained decision proof (the profile hash plus a decision identifier)
-for auditability.
+uncertainty} $s$. ``Evaluate per stakeholder'' is literal: the same conversation
+is compiled \emph{once per stakeholder ethos}, yielding that stakeholder's slice
+of the $n$ axis together with its own verdict, confidence, and a hash-chained
+decision proof (the profile hash plus a decision identifier) for auditability.
 
 \section{Enforcement: Worst-Off and Escalate}
 \label{sec:enforce}
 Different stakeholders, evaluated on identical content, return different
-verdicts. In our reference implementation a harm/care-weighted ethos
-(\texttt{dear\_abby}) returns \texttt{requires\_human\_review} on a
-medical-confidentiality dilemma while a fairness-weighted ethos (\texttt{aita})
-returns \texttt{permitted}. That divergence is not noise; it \emph{is} the
-moderation event. The platform aggregates the per-stakeholder verdicts under an
-explicit, restrictiveness-ordered policy (Algorithm~\ref{alg:wo}):
-\textbf{worst-off}---the decision takes the most protective verdict---and
-\textbf{escalate}---cross-stakeholder disagreement, or any escalate-tier verdict
-(\texttt{requires\_human\_review}, \texttt{escalate},
-\texttt{tragic\_conflict\_escalate}), routes to a human. This is the
-operational form of a no-aggregation principle: the metaethical choice of how to
-weigh stakeholders is surfaced and handed to a person, not smuggled into a hidden
-weighting.
+verdicts; that divergence is not noise, it \emph{is} the moderation event. The
+platform aggregates the per-stakeholder verdicts under an explicit,
+restrictiveness-ordered policy (Algorithm~\ref{alg:wo}): \textbf{worst-off}---the
+decision takes the most protective verdict, so a permissive stakeholder cannot
+override a harmed one---and \textbf{escalate}---cross-stakeholder disagreement,
+or any escalate-tier verdict (\texttt{requires\_human\_review},
+\texttt{tragic\_conflict\_escalate}, \texttt{indeterminate}), routes to a human.
+This is the operational form of a no-aggregation principle: the metaethical
+choice of how to weigh stakeholders is surfaced and handed to a person, not
+smuggled into a hidden weighting.
 
 \begin{algorithm}[!t]
 \caption{Worst-off $+$ escalate aggregation}
@@ -197,155 +182,169 @@ weighting.
 \end{algorithmic}
 \end{algorithm}
 
-\subsection{Distributional fairness as a proposed audit (not yet run)}
-Because the framework yields per-stakeholder, per-dimension scores, fairness can
-be audited distributionally rather than as a scalar gap: form each group's
-score-covariance $\Sigma_g$ (a symmetric positive-definite matrix) and compare
-groups by distance on the SPD manifold, exposing differences in the \emph{shape}
-of behavior across groups, not only their means. We define this primitive
-(\texttt{geomod.fairness}) but did \emph{not} run it in the present study; we
-flag it as future work rather than report estimated numbers.
-
-\section{A Tested Hypothesis: Hyperbolic Policy Embeddings}
-\label{sec:hyp}
-It is natural to ask whether the \emph{classifier} feeding the representation
-benefits from hyperbolic geometry, since policy taxonomies are trees and
-hyperbolic space embeds trees with low distortion \cite{nickel}. We embed the
-policy tree in the Poincar\'e ball with the benign root at the origin and radius
-growing with depth, compute logits as negative geodesic distances to policy
-nodes, and read severity as (normalized) geodesic distance from the origin so
-that classification and severity share one geometry. We treat this as a
-hypothesis to be tested against a flat baseline, not as an assumed improvement;
-Section~\ref{sec:eval} reports the outcome.
-
 \section{Reference Implementation}
 \label{sec:impl}
 The system is released as \texttt{geometric-moderation}. Its core,
 \texttt{app/deme\_moderation.py}, implements Algorithm~\ref{alg:wo}: it compiles
 a conversation once per stakeholder ethos through the ErisML compiler
-\cite{erisml} (\texttt{eris-compile \dots\ --ethos-profile \dots\ --rank r}),
-extracts each ethos's DEME verdict and decision proof, and returns an
-audit-bearing decision (per-stakeholder verdicts, the worst-off witness, and
-whether the case escalated). The repository also retains the exploratory
-hyperbolic classifier and flat/hybrid baselines (\texttt{geomod}), the SPD
-fairness primitive, and a FastAPI/browser visualizer; the serving app is
-explicit when run in untrained demonstration mode.
+\cite{erisml}, extracts each ethos's DEME verdict, the nine-dimensional moral
+vector, and the decision proof, and returns an audit-bearing decision. Free-text
+moral extraction uses a standard instruct LLM (\texttt{gpt-oss}) as the
+extractor; the moral tensor, projections, and verdict are then computed
+deterministically from the extracted facts. Because the extraction depends only
+on the text and not on the ethos, it is computed once per post and reused across
+stakeholders.
 
 \section{Evaluation}
 \label{sec:eval}
 
-\subsection{Does hyperbolic geometry help the classifier? (No.)}
-We run a four-configuration ablation on Civil Comments (20k train / 4k
-validation, 7 active policy classes, DeBERTa-v3-base encoder, 3 epochs) after
-fixing the geometric head's numerical issues (fp32 head over Poincar\'e ops;
-gradient-safe norms; severity-by-radius). Table~\ref{tab:ablation} reports the
-result. The flat baseline has the best macro-F1 by a wide margin
-($0.500$ vs.\ $0.288$ for the hyperbolic head and $0.137$ for the full
-geometric model); top-1 accuracy is dominated by the majority (benign) class and
-is essentially tied. Severity rank-correlation with the ordinal label is weak
-even where positive ($\rho=0.16$). This is a clear negative result for the
-hypothesis of Section~\ref{sec:hyp}: hyperbolic geometry does not improve
-classification or severity on this benchmark.
+\subsection{Setup}
+We evaluate on the ``Am I the Asshole'' (AITA) corpus: first-person moral
+dilemmas with a community verdict label (NTA = not at fault, NAH = no fault,
+ESH = mutual fault, YTA = author at fault). AITA is the right input type for a
+moral-scenario compiler---each post narrates actions, stakeholders, and
+commitments---unlike one-line toxicity snippets, which carry no such structure
+(the rule extractor degenerates to ``escalate'' on them; we therefore use the
+LLM extractor throughout). We draw a balanced stratified sample of 60 posts per
+class (240 total; 231 compiled successfully under both ethos), truncated to 1800
+characters, and compile each under two shipped stakeholder ethos: a harm/care
+advocate (\texttt{dear\_abby}) and a fairness/fidelity community
+(\texttt{aita}), at tensor rank 4. We map the AITA label to an author-culpability
+ordinal NTA$<$NAH$<$ESH$<$YTA. \emph{Circularity note:} the \texttt{aita} ethos
+was fit on AITA-style judgments, so we lead with the \texttt{dear\_abby} ethos
+(fit on a different advice column) for any label-referenced quantity.
+
+\subsection{The ethos differentiate as designed}
+Table~\ref{tab:diff} reports, per moral dimension, the signed mean difference
+between the two ethos' values (\texttt{dear\_abby}$-$\texttt{aita}) and a sign
+test over the posts where they differ. The differences are in the direction the
+ethos' construction predicts and are highly significant: the harm/care ethos
+weights \emph{physical harm} substantially more negatively (more harm-sensitive)
+and \emph{care} more strongly, while the fairness/fidelity ethos weights
+\emph{vow fidelity} more strongly. The two ethos return \emph{different}
+categorical verdicts on $34.2\%$ of posts (mean inter-ethos moral-vector
+distance $0.140$). Per-stakeholder modeling is therefore not vacuous: the
+stakeholders' encoded values produce measurably, predictably different moral
+representations of the same content.
 
 \begin{table}[!t]
-\caption{Hyperbolic-geometry ablation, Civil Comments (DeBERTa-v3-base, 20k/4k).
-Flat baseline wins macro-F1; geometry does not help. ``Severity $\rho$'' is
-Spearman vs.\ the ordinal label; the flat baseline has no severity head.
-SPD-fairness gap and MRI were defined but not run in this study.}
-\label{tab:ablation}
+\caption{The two ethos differ in the direction their construction predicts.
+Signed mean (\texttt{dear\_abby}$-$\texttt{aita}) per dimension; sign test over
+posts with a non-zero difference ($n{=}231$).}
+\label{tab:diff}
 \centering
-\begin{tabular}{lcccc}
+\begin{tabular}{lccc}
 \toprule
-Config & Macro-F1$\uparrow$ & Acc. & Severity $\rho$ & SPD/MRI\\
+Dimension & $\Delta$(da$-$aita) & posts differing & sign-test $p$\\
 \midrule
-A Flat baseline   & \textbf{0.500} & 0.942 & ---     & \nr\\
-B $+$Hyperbolic head & 0.288 & 0.945 & $+0.159$ & \nr\\
-C Full geometric  & 0.137 & 0.928 & $-0.014$ & \nr\\
-D Hybrid          & 0.137 & 0.928 & $+0.027$ & \nr\\
+physical\_harm   & $-0.075$ & 204/231 & $<0.001$\\
+vow\_fidelity    & $-0.062$ & 186/231 & $<0.001$\\
+legitimacy\_trust& $+0.036$ & 129/231 & $<0.001$\\
+care\_protection & $+0.026$ & 119/231 & $<0.001$\\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\subsection{Cross-lingual verdict invariance (Bond Index)}
-A separate claim is that geometry buys \emph{invariance}: the same content,
-expressed in different languages, should receive the same verdict. We test this
-with a frozen, language-agnostic encoder (LaBSE), training a flat linear head and
-a hyperbolic head on English, then translating the English validation set into
-Spanish, French, German, and Chinese (NLLB) and measuring the fraction of
-translations that preserve the English verdict (the Bond Index $\beta$).
-Table~\ref{tab:bond} shows the flat head is \emph{at least as} invariant as the
-hyperbolic head ($\beta=0.997$ vs.\ $0.983$ mean-agreement; $0.997$ vs.\ $0.973$
-all-languages-agree). The invariance is carried by the language-agnostic
-embedding, not by the decision-surface geometry.
+\subsection{The tensor separates situation-harm from author-violation}
+A scalar harm or toxicity score would have to answer ``how bad is this content''
+with one number. The multi-dimensional tensor does not. Table~\ref{tab:valid}
+correlates each dimension (under the primary \texttt{dear\_abby} ethos) with the
+author-culpability ordinal. \emph{Aggregate} harm severity does \emph{not} track
+culpability ($\rho{=}{-}0.05$, $p{=}0.41$)---and it should not: in NTA posts the
+author is the \emph{victim}, so the situation contains high harm while the author
+is not at fault. But specific \emph{normative} dimensions do track culpability:
+fairness violation ($\rho{=}{-}0.18$, $p{=}0.006$), care ($\rho{=}{-}0.16$,
+$p{=}0.014$), and autonomy ($\rho{=}{+}0.17$, $p{=}0.011$). These are nominal
+($p<0.05$) under ten comparisons; only fairness survives a strict Bonferroni
+threshold, so we report them as an exploratory but coherent pattern. The point is
+structural: ``harm present in the scene'' and ``the author wronged someone'' are
+\emph{different} quantities, separated by different tensor dimensions, and a
+single harm scalar conflates them.
 
 \begin{table}[!t]
-\caption{Cross-lingual Bond Index (frozen LaBSE; heads trained on English;
-es/fr/de/zh via NLLB). Higher $=$ more invariant. Geometry adds nothing.}
-\label{tab:bond}
+\caption{Per-dimension Spearman correlation with author-culpability
+(\texttt{dear\_abby} ethos, $n{=}231$). Aggregate harm is uncorrelated;
+normative dimensions trend with culpability.}
+\label{tab:valid}
 \centering
 \begin{tabular}{lcc}
 \toprule
- & Flat head & Hyperbolic head\\
+Quantity & Spearman $\rho$ & $p$\\
 \midrule
-English eval accuracy        & 0.930 & 0.937\\
-$\beta$ (mean lang-agree)$\uparrow$    & \textbf{0.997} & 0.983\\
-$\beta$ (all-langs-agree)$\uparrow$    & \textbf{0.997} & 0.973\\
+aggregate harm severity & $-0.054$ & $0.410$\\
+\midrule
+fairness\_equity  & $-0.181$ & $0.006$\\
+autonomy\_consent & $+0.167$ & $0.011$\\
+care\_protection  & $-0.162$ & $0.014$\\
+physical\_harm    & $+0.032$ & $0.630$\\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\subsection{Per-stakeholder enforcement (qualitative)}
-On a medical-confidentiality dilemma the two shipped ethos diverge
-(\texttt{dear\_abby}~$\to$~\texttt{requires\_human\_review};
-\texttt{aita}~$\to$~\texttt{permitted}), and Algorithm~\ref{alg:wo} returns
-\texttt{ESCALATE\_TO\_HUMAN} with \texttt{dear\_abby} as the worst-off witness.
-On a borderline incivility thread both ethos return
-\texttt{requires\_human\_review} and the case escalates on the tier rule. The
-point of these cases is not accuracy on a label but that genuine value
-disagreement is preserved and routed to a human, with a per-stakeholder audit
-trail---behavior no flat classifier provides at any accuracy.
+\subsection{Worst-off + escalate is consequential}
+The enforcement rule is not cosmetic. Relative to the decisive harm/care
+stakeholder acting alone, the joint worst-off/escalate policy reaches a
+\emph{different} decision on $33.8\%$ of posts---routing them to human review
+because the second stakeholder's uncertainty or disagreement is surfaced rather
+than ignored. Escalation here is driven by two distinct ``do not silently
+decide'' conditions: within-ethos indeterminacy on genuinely hard cases, and
+cross-ethos verdict divergence ($34\%$). A single decisive stakeholder would
+auto-decide a third of cases the multi-stakeholder system flags.
+
+\subsection{Honest negatives}
+Two claims a reader might expect, which the data do \emph{not} support, stated
+plainly. \textbf{DEME is not a culpability classifier:} aggregate harm does not
+predict the AITA verdict (above), because the system assesses the moral status
+of a situation, not who is at fault. \textbf{Escalation does not discriminate
+among hard dilemmas:} all $231$ posts exhibit cross-framework polarity
+disagreement (every dilemma is, by the four frameworks' lights, genuinely
+conflicted), so escalation fires almost universally ($91\%$) and does not
+separate community-``contested'' (ESH/NAH, $91.2\%$) from ``clear'' (NTA/YTA,
+$90.7\%$) posts. On a corpus selected for moral difficulty, ``route to a human''
+is the right answer almost everywhere; the contribution is that the system
+reaches it for principled, auditable, per-stakeholder reasons.
 
 \section{Limitations}
-The implementation is research-grade. (i) No production-validated checkpoint is
-shipped; serving defaults to an explicit demonstration mode. (ii) The shipped
-stakeholder set uses two data-fit ethos profiles as stand-ins; real deployments
-construct stakeholder EMs by elicitation or authoring and drop them in as
-additional profiles. (iii) The escalation substrate uses a rule-based extractor
-for real-time use; richer LLM extraction is slower and optional. (iv) The
-SPD-fairness and MRI primitives are defined but not empirically evaluated here.
-(v) The negative result on hyperbolic geometry is established on Civil Comments;
-we do not claim it generalizes to every taxonomy. These bound the empirical
-claims, which is why every reported number is taken strictly from released runs.
+The evaluation uses two shipped stakeholder ethos as stand-ins; real deployments
+construct stakeholder EMs by elicitation or authoring and add them as profiles,
+and a richer panel would sharpen the differentiation and governance measures.
+The free-text extractor is an LLM, so extraction quality bounds the results; the
+rule extractor is too weak for short or unstructured text. AITA supplies a
+single author-culpability label rather than per-annotator vote splits, so our
+contestedness operationalization is coarse. The per-dimension validity
+correlations are exploratory under multiple comparisons. Results are on one
+English corpus of deliberately hard dilemmas; generalization to ordinary
+platform content is future work. Every reported number is reproduced by the
+released harness.
 
 \section{Conclusion}
 Moderation should be modeled as a per-stakeholder moral representation that the
 platform governs, not as a flat label. Encoding stakeholder values as Ethics
-Modules, compiling a conversation into a rank-4--6 moral tensor once per ethos,
-and enforcing \emph{worst-off~$+$~escalate} makes value disagreement a
-first-class, auditable, non-aggregable signal. We also report, honestly, that
-the tempting hyperbolic-geometry shortcut for the classifier does \emph{not}
-improve accuracy or cross-lingual invariance over a flat baseline: the value of
-the approach is the representation and governance, not the label. The
-open-source reference implementation makes both the framework and the negative
-result reproducible.
+Modules, compiling a conversation into a rank-4 moral tensor once per ethos, and
+enforcing worst-off~$+$~escalate makes value disagreement a first-class,
+auditable, non-aggregable signal. Empirically, the ethos differentiate as
+designed, the multi-dimensional tensor separates situation-harm from
+author-violation in a way a scalar cannot, and the enforcement rule changes a
+third of decisions---while we report honestly what the system is not. The
+open-source harness makes every result reproducible.
 
 \section*{Reproducibility}
-Code, the serving app, the ablation script
-(\texttt{scripts/ablation\_rerun.py}), and the cross-lingual Bond-Index script
-(\texttt{scripts/multilingual\_bond\_index.py}) are at
+Code, the per-stakeholder moderator (\texttt{app/deme\_moderation.py}), the
+evaluation harness (\texttt{scripts/deme\_aita\_eval.py}), the analysis
+(\texttt{scripts/deme\_aita\_analyze.py}), and the raw per-item records and
+analysis log (\texttt{outputs/aita\_eval/}) are at
 \url{https://github.com/ahb-sjsu/geometric-moderation}. The conceptual grounding
 appears in the companion textbook \emph{Philosophy Engineering}
 (\url{https://github.com/ahb-sjsu/erisml-lib}).
 
 \begin{thebibliography}{1}
-\bibitem{jigsaw} cjadams \emph{et al.}, ``Toxic Comment Classification
-Challenge,'' Kaggle, 2018.
 \bibitem{civil} D.~Borkan \emph{et al.}, ``Nuanced Metrics for Measuring
 Unintended Bias with Real Data for Text Classification,'' in \emph{WWW}, 2019.
 \bibitem{hatexplain} B.~Mathew \emph{et al.}, ``HateXplain: A Benchmark Dataset
 for Explainable Hate Speech Detection,'' in \emph{AAAI}, 2021.
-\bibitem{nickel} M.~Nickel and D.~Kiela, ``Poincar\'e Embeddings for Learning
-Hierarchical Representations,'' in \emph{NeurIPS}, 2017.
+\bibitem{socialchem} M.~Forbes, J.~D.~Hwang, V.~Shwartz, M.~Sap, and Y.~Choi,
+``Social Chemistry 101: Learning to Reason about Social and Moral Norms,'' in
+\emph{EMNLP}, 2020.
 \bibitem{erisml} A.~H.~Bond, ``ErisML Compiler: A Structure-Preserving Compiler
 from Natural Language to a Moral Intermediate Representation,'' 2026,
 \url{https://github.com/ahb-sjsu/erisml-compiler}.

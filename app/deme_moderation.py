@@ -60,17 +60,22 @@ DEFAULT_STAKEHOLDERS = {
 }
 
 # Restrictiveness ordering for the worst-off rule (higher = more protective).
+# Keys are the canonical DEME VerdictKind vocabulary (ir/schemas.py: VerdictKind):
+# permitted, permitted_with_residue, tragic_conflict_escalate, prohibited,
+# requires_human_review, indeterminate.
 RESTRICTIVENESS = {
-    "prefer": 0,
-    "neutral": 1,
-    "permitted": 1,
+    "permitted": 0,
+    "permitted_with_residue": 1,
+    "indeterminate": 2,            # cannot determine -> caution + escalate
     "requires_human_review": 3,
-    "escalate": 3,
     "tragic_conflict_escalate": 3,
-    "forbid": 4,
-    "forbidden": 4,
+    "prohibited": 4,              # the most protective (forbid) verdict
 }
-_ESCALATE_TIER = {"requires_human_review", "escalate", "tragic_conflict_escalate"}
+_ESCALATE_TIER = {
+    "indeterminate",
+    "requires_human_review",
+    "tragic_conflict_escalate",
+}
 
 
 def _compile_under_ethos(text: str, ethos_path: Path, rank: int) -> dict[str, Any]:

@@ -1,0 +1,66 @@
+loaded 240 rows; both-ethos-ok = 231 (scipy=yes)
+  per class: {'NTA': 59, 'NAH': 58, 'ESH': 55, 'YTA': 59}
+
+=== E3  validity: harm severity vs AITA culpability ===
+  [dear_abby] Spearman(harm_severity, culpability) rho=-0.054 p=0.4102
+  [aita     ] Spearman(harm_severity, culpability) rho=-0.053 p=0.4219
+  mean harm severity by class (primary):
+    NTA: 2.039  (n=59)
+    NAH: 1.879  (n=58)
+    ESH: 2.011  (n=55)
+    YTA: 1.920  (n=59)
+  per-dimension Spearman(value, culpability) [primary ethos]:
+    fairness_equity          rho=-0.181 p=0.0058 *
+    autonomy_consent         rho=+0.167 p=0.0109 *
+    care_protection          rho=-0.162 p=0.0135 *
+    legitimacy_trust         rho=+0.091 p=0.1702
+    vow_fidelity             rho=-0.068 p=0.3014
+    repair_residue           rho=+0.053 p=0.4224
+    epistemic_quality        rho=+0.044 p=0.5076
+    physical_harm            rho=+0.032 p=0.6302
+    rights_respect           rho=+0.028 p=0.6711
+    third_party_externality  rho=-0.026 p=0.6979
+
+=== E2  per-stakeholder differentiation (dear_abby vs aita) ===
+  mean L2 distance between ethos moral vectors = 0.140
+  verdict-divergence rate = 79/231 = 34.2%
+  dimensions that diverge most (mean abs-diff): vow_fidelity=0.087, physical_harm=0.075, legitimacy_trust=0.036, care_protection=0.026
+
+=== A  systematic directional difference (signed mean dear_abby - aita) ===
+  care_protection          mean(da-aita)=+0.026  nonzero=119/231  sign-test p=0.000
+  fairness_equity          mean(da-aita)=+0.006  nonzero=26/231  sign-test p=0.000
+  legitimacy_trust         mean(da-aita)=+0.036  nonzero=129/231  sign-test p=0.000
+  physical_harm            mean(da-aita)=-0.075  nonzero=204/231  sign-test p=0.000
+  rights_respect           mean(da-aita)=-0.000  nonzero=1/231  sign-test p=0.317
+  vow_fidelity             mean(da-aita)=-0.062  nonzero=186/231  sign-test p=0.000
+
+=== B  governance effect (worst-off + escalate vs single ethos) ===
+  joint decision differs from dear_abby-alone : 78/231 = 33.8%
+  joint decision differs from aita-alone      : 1/231 = 0.4%
+  escalations caused purely by ethos disagreement (not tier): 0/231 = 0.0%
+
+=== D  cross-framework disagreement (the escalation trigger) ===
+  posts with >=2 distinct framework polarities: 231/231 = 100.0%
+  distribution of #distinct polarities: {2: 3, 3: 117, 4: 111}
+
+=== E1  conflict concentration: contested (ESH/NAH) vs clear (NTA/YTA) ===
+  contested (n=113): escalation=91.2%  cross-framework-disagreement=100.0%
+  clear     (n=118): escalation=90.7%  cross-framework-disagreement=100.0%
+  by class:
+    NTA: escalation=88.1%  cross-framework-disagreement=100.0%  (n=59)
+    NAH: escalation=86.2%  cross-framework-disagreement=100.0%  (n=58)
+    ESH: escalation=96.4%  cross-framework-disagreement=100.0%  (n=55)
+    YTA: escalation=93.2%  cross-framework-disagreement=100.0%  (n=59)
+
+=== descriptive: mean moral-vector dimensions by class (primary ethos) ===
+  dim                           NTA      NAH      ESH      YTA
+  autonomy_consent          -0.083   -0.034   -0.025   -0.018
+  care_protection           +0.406   +0.450   +0.304   +0.283
+  epistemic_quality         -0.037   -0.021   -0.009   -0.019
+  fairness_equity           -0.010   -0.023   -0.027   -0.043
+  legitimacy_trust          -0.324   -0.176   -0.287   -0.226
+  physical_harm             -0.815   -0.834   -0.850   -0.826
+  repair_residue            -0.465   -0.480   -0.462   -0.460
+  rights_respect            +0.000   -0.002   +0.000   +0.000
+  third_party_externality   -0.247   -0.250   -0.268   -0.249
+  vow_fidelity              +0.352   +0.397   +0.320   +0.298
